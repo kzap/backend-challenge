@@ -1,9 +1,9 @@
 {{template "header"}}
 <div class="container-fluid">
-  <h1>Index</h1>
+  <h1>Conversations</h1>
   <ul>
   {{range .}}
-    <li><a href="{{.URL}}">{{.Description}}</a> - (<em>{{.URL}}</em>)</li>
+    <li><a href="/conversations/{{ . }}">{{.}}</a></li>
   {{end}}
   </ul>
 </div>

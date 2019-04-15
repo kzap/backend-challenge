@@ -1,5 +1,12 @@
 {{template "header"}}
 <div class="container-fluid">
-  <h1>Conversation: {{.}}</h1>
+  <h1>Conversation: {{.ConversationID}}</h1>
+  <ul>
+  {{range .Conversations}}
+    <li><strong>{{ .Sender }}</strong> ({{ .ID }} - {{ .CreatedDate }})<br />
+      <p>{{ .Message }}</p>
+    </li>
+  {{end}}
+  </ul>
 </div>
 {{template "footer"}}
