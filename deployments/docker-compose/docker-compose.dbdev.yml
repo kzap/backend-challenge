@@ -1,0 +1,21 @@
+# docker-compose -f docker-compose.yml -f deployments/docker-compose/docker-compose.dbdev.yml <command>
+version: '3.2'
+
+services:
+  db:
+    ports:
+      - "${ADA_DB_MYSQL_PORT}:3306"
+
+  dbadmin:
+    image: phpmyadmin/phpmyadmin:4.7
+    env_file:
+      - ./deployments/docker-compose/env/db.env
+      - ./deployments/docker-compose/env/dbadmin.env
+    depends_on:
+      - db
+    networks:
+      - ada_internal
+    ports:
+      - "${ADA_DBADMIN_PORT}:80"
+    volumes:
+      - /sessions

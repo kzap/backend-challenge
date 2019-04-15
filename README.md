@@ -1,73 +1,53 @@
-# Ada Support Backend Coding Challenge
+Ada Backend Challenge
+==========
 
-Hello there! :wave:
+> How to easily get this program up and running on your computer using `go`, `docker` and `docker-compose`
 
-This is our challenge for potential new backend & infrastructure developer team members. We'd like to see how you tackle an open-ended project in Ada's domain (chat). We don't mind what language you use to complete the challenge. Feel free to try something new, or to use technology that you're already comfortable with. We're partial to Python here at Ada, but please feel free to use whatever you'd like :smile:
+## Prerequisites:
 
-## Your Quest
+- Clone our API repo: `git clone -o origin git@github.com:kzap/ada-backend-challenge.git`
 
-We'd like you to design and build a simple web service responsible for two things:
+- Install [Go](https://golang.org/doc/install) for your Operating System.
 
-1. Accept incoming chat messages over HTTP
-2. Serve up conversation history over HTTP
+- Install [Docker and Docker Compose](https://www.docker.com/community-edition) for your Operating System.
 
-When you're done, please open a pull request in this repository and we'll take a look! Expect us to give some feedback and ask questions to better understand your thought process.
+## How to run using Go:
 
-### Important Notes
+1. Go to the `ada-backend-challenge` directory and run the main executable using `go run`.
 
-- Please don't spend too long on this! It shouldn't take more than 3 hours with a familiar technology stack.
-- Please reach out to anson@ada.support and shihan@ada.support if you have any questions whatsoever! This should be fun and not stressful.
-- We intentionally left things somewhat ambiguous so that you can be creative. If you'd rather have things specified closely, we can give you more guidance. Just ask!
-- Feel free to use any technology and programming language that you'd like
+  ```sh
+  $ go run ./cmd/backend-challenge/
+  ```
 
-## Specifications
+2. Open `http://0.0.0.0:8000` in your web browser to see the Index page.
 
-Your solution should start an HTTP service on any port you'd like. Please include instructions on how to start your service (so that we can test the functionality!)
+## How to run using Docker:
 
-### `/messages/` Resource
+1. In the `ada-backend-challenge` repo directory, copy `./deployments/docker-compose/.env.sample` to `./.env` and customize as needed.
 
-The `/messages/` resource accepts HTTP POST actions to create new messages in the conversation. A typical message resource has the format of:
+2. Build and run the stack using `docker-compose`:
 
-```javascript
-{
-    "sender": "anson",
-    "conversation_id": "1234",
-    "message": "I'm a teapot"
-}
+  ```sh
+  docker-compose up --build -d
+  ```
+
+> Congratulations, you may now access API at `http://0.0.0.0:18080/` (or whatever your Docker Machine IP is and the port you specified in `ADA_WEB_HTTP_PORT`).
+
+## Additional Tools:
+
+We have additional `docker-compose` files you may use to enhance your development:
+
+### MySQL Debugging
+
+> Expose the internal database to your computer or access it via phpMyAdmin so you can view the database.
+
+- Configure the following variables in your `.env` file:
+  - `ADA_DB_MYSQL_PORT` - the port on your computer where you want the MySQL service inside the container to be available on.
+  - `ADA_DBADMIN_PORT` - the port on your computer where you want phpMyAdmin to be accessible on.
+
+- Run docker-compose with the following command
+```sh
+docker-compose -f docker-compose.yml -f deployments/docker-compose/docker-compose.dbdev.yml up
 ```
 
-Here, `"sender"` is a string username, `"conversation_id"` is a unique identifier for a particular conversation, and `"message"` is a string message to be logged to a conversation.
-
-### `/conversations/<conversation_id>` Resource
-
-The `/conversations/<conversation_id>` resource accepts an HTTP GET action and returns a list of conversation messages. A typical conversation as the format of:
-
-```javascript
-{
-    "id": "1234",
-    "messages": [
-        {
-            "sender": "anson",
-            "message": "I'm a teapot",
-            "created": "2018-01-17T04:50:14.883Z"
-        },
-        {
-            "sender": "david",
-            "message": "Short and stout",
-            "created": "2018-01-17T04:52:17.201Z"
-        }
-    ]
-}
-```
-
-Here, a conversation with two messages is presented.
-
-## Clarifications
-- Conversation IDs can follow any format you choose, as long as they are unique!
-- Conversations should be persisted, but how you persist them is up to you :smile:
-- You can assume that the entities sending incoming chat messages are authenticated and trustworthy (authentication is outside of the scope of this project)
-- Don't worry about pagination on the conversations
-- Don't worry about a list resource for conversations or messages
-- We recommend validating incoming data
-- Tests are always a good idea
-- Please give us instructions on how to run your service when you open your Pull Request
+- Access phpMyAdmin at `http://0.0.0.0:18081` (or whatever port you put in `ADA_DBADMIN_PORT`).
