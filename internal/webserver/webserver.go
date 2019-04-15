@@ -1,10 +1,12 @@
 package webserver
 
 import (
+	"crypto/rand"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/kzap/ada-backend-challenge/internal/config"
@@ -45,7 +47,8 @@ func Start(mysqlConfig config.DbConfig) {
 	routes = append(routes, Route{URL: "/", Description: "Homepage", Methods: "GET", Handler: GetIndex})
 	routes = append(routes, Route{URL: "/conversations", Description: "Show conversations", Methods: "GET", Handler: GetConversationList})
 	routes = append(routes, Route{URL: "/conversations/{conversation_id}", Description: "View a Conversation", Methods: "GET", Handler: GetConversation})
-	routes = append(routes, Route{URL: "/messages", Description: "Message handler", Methods: "POST", Handler: PostMessages})
+	routes = append(routes, Route{URL: "/messages", Description: "Message Input Form", Methods: "GET", Handler: GetMessages})
+	routes = append(routes, Route{URL: "/messages", Description: "Message POST Handler", Methods: "POST", Handler: PostMessages})
 
 	router := mux.NewRouter()
 	router.StrictSlash(true)
@@ -186,16 +189,41 @@ func GetConversation(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetMessages shows the Message form
+func GetMessages(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	err := templates.ExecuteTemplate(w, "messages.html", nil)
+	if err != nil {
+		renderError(w, "EXECUTE_TEMPLATE_ERROR", http.StatusInternalServerError)
+		log.Println(err)
+	}
+}
+
 // PostMessages handles the receiving of messages
 func PostMessages(w http.ResponseWriter, r *http.Request) {
 	var err error
 
+	formConversationID := r.FormValue("conversation_id")
+	if formConversationID == "" {
+		formConversationID = randToken(8)
+	}
+	formSender := r.FormValue("sender")
+	if strings.TrimSpace(formSender) == "" {
+		renderError(w, "FORM_EMPTY_SENDER", http.StatusUnprocessableEntity)
+		return
+	}
+	formMessage := r.FormValue("message")
+	if strings.TrimSpace(formMessage) == "" {
+		renderError(w, "FORM_EMPTY_MESSAGE", http.StatusUnprocessableEntity)
+		return
+	}
+
 	// perform a db.Query insert
 	insertQuery := fmt.Sprintf(
 		"INSERT INTO `conversations` VALUES (DEFAULT, '%v', '%v', '%v', DEFAULT)",
-		"conversation_id",
-		"sender",
-		"message")
+		formConversationID,
+		formSender,
+		formMessage)
 	_, err = db.Query(insertQuery)
 
 	// if there is an error inserting, handle it
@@ -206,11 +234,20 @@ func PostMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("SUCCESS"))
+	http.Redirect(w, r, "/conversations/"+formConversationID, 302)
 }
 
 func renderError(w http.ResponseWriter, errorMsg string, responseCode int) {
 	w.WriteHeader(responseCode)
 	w.Write([]byte(errorMsg))
+}
+
+func randToken(len int) string {
+	b := make([]byte, len)
+	_, err := rand.Read(b)
+	if err != nil {
+		log.Fatal("read.Read error", err)
+	}
+
+	return fmt.Sprintf("%x", b)
 }

@@ -1,10 +1,12 @@
-{{template "header"}}
-<div class="container-fluid">
+{{template "_header"}}
+<div class="container">
   <h1>Index</h1>
   <ul>
   {{range .}}
+    {{if (eq .Methods "GET")}}
     <li><a href="{{.URL}}">{{.Description}}</a> - (<em>{{.URL}}</em>)</li>
+    {{end}}
   {{end}}
   </ul>
 </div>
-{{template "footer"}}
+{{template "_footer"}}
