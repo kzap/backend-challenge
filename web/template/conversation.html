@@ -1,6 +1,7 @@
 {{template "_header"}}
 <div class="container">
   <h1>Conversation: {{.ConversationID}}</h1>
+  <a href="/conversations/{{.ConversationID}}.json" class="btn btn-primary">View JSON</a>
   <ul>
   {{range .Conversations}}
     <li><strong>{{ .Sender }}</strong> ({{ .ID }} - {{ .CreatedDate }})<br />

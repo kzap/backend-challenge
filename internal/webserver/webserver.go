@@ -2,6 +2,8 @@ package webserver
 
 import (
 	"crypto/rand"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
@@ -18,18 +20,18 @@ import (
 
 // Route describes the URLs available for this program
 type Route struct {
-	URL         string `json:"url,omitempty"`
-	Description string `json:"description,omitempty"`
-	Methods     string `json:"methods,omitempty"`
+	URL         string
+	Description string
+	Methods     string
 	Handler     func(w http.ResponseWriter, r *http.Request)
 }
 
 type Conversation struct {
-	ID             int
-	ConversationID string
-	Sender         string
-	Message        string
-	CreatedDate    string
+	ID             int    `json:"-"`
+	ConversationID string `json:"-"`
+	Sender         string `json:"sender"`
+	Message        string `json:"message"`
+	CreatedDate    string `json:"created"`
 }
 
 // parse templates dir
@@ -46,6 +48,7 @@ func Start(mysqlConfig config.DbConfig) {
 
 	routes = append(routes, Route{URL: "/", Description: "Homepage", Methods: "GET", Handler: GetIndex})
 	routes = append(routes, Route{URL: "/conversations", Description: "Show conversations", Methods: "GET", Handler: GetConversationList})
+	routes = append(routes, Route{URL: "/conversations/{conversation_id}.json", Description: "View a Conversation", Methods: "GET", Handler: GetConversationJSON})
 	routes = append(routes, Route{URL: "/conversations/{conversation_id}", Description: "View a Conversation", Methods: "GET", Handler: GetConversation})
 	routes = append(routes, Route{URL: "/messages", Description: "Message Input Form", Methods: "GET", Handler: GetMessages})
 	routes = append(routes, Route{URL: "/messages", Description: "Message POST Handler", Methods: "POST", Handler: PostMessages})
@@ -134,43 +137,49 @@ func GetConversationList(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func getConversationsByID(conversationID string) ([]Conversation, error) {
+	var err error
+	conversations := []Conversation{}
+
+	rows, err := db.Query("SELECT `id`, `conversation_id`, `sender`, `message`, `created_date` FROM `conversations` WHERE `conversation_id` = ?", conversationID)
+	if err != nil {
+		log.Println(err)
+		return conversations, errors.New("ERROR_DB_QUERY")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var c Conversation
+		err = rows.Scan(&c.ID, &c.ConversationID, &c.Sender, &c.Message, &c.CreatedDate)
+		if err != nil {
+			log.Println(err)
+			return conversations, errors.New("ERROR_ROWS_SCAN")
+		}
+		conversations = append(conversations, c)
+	}
+	err = rows.Err()
+	if err != nil {
+		log.Println(err)
+		return conversations, errors.New("ERROR_ROWS_NEXT")
+	}
+
+	if len(conversations) == 0 {
+		log.Println("Invalid Conversation ID")
+		return conversations, errors.New("CONVERSATION_NOT_FOUND")
+	}
+
+	return conversations, nil
+}
+
 // GetConversation shows the conversation
 func GetConversation(w http.ResponseWriter, r *http.Request) {
 	var err error
 	vars := mux.Vars(r)
 
 	conversationID := vars["conversation_id"]
-	rows, err := db.Query("SELECT `id`, `conversation_id`, `sender`, `message`, `created_date` FROM `conversations` WHERE `conversation_id` = ?", conversationID)
+	conversations, err := getConversationsByID(conversationID)
 	if err != nil {
-		renderError(w, "ERROR_DB_QUERY", http.StatusInternalServerError)
-		log.Println(err)
-
-		return
-	}
-	defer rows.Close()
-
-	conversations := []Conversation{}
-	for rows.Next() {
-		var c Conversation
-		err = rows.Scan(&c.ID, &c.ConversationID, &c.Sender, &c.Message, &c.CreatedDate)
-		if err != nil {
-			renderError(w, "ERROR_ROWS_SCAN", http.StatusInternalServerError)
-			log.Println(err)
-			return
-		}
-		conversations = append(conversations, c)
-	}
-	err = rows.Err()
-	if err != nil {
-		renderError(w, "ERROR_ROWS_NEXT", http.StatusInternalServerError)
-		log.Println(err)
-		return
-	}
-
-	if len(conversations) == 0 {
-		renderError(w, "CONVERSATION_NOT_FOUND", http.StatusNotFound)
-		log.Println("Invalid Conversation ID")
-		return
+		renderError(w, fmt.Sprintf("%s", err), http.StatusInternalServerError)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -187,6 +196,30 @@ func GetConversation(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "EXECUTE_TEMPLATE_ERROR", http.StatusInternalServerError)
 		log.Println(err)
 	}
+}
+
+// GetConversationJSON shows the conversation results as JSON
+func GetConversationJSON(w http.ResponseWriter, r *http.Request) {
+	var err error
+	vars := mux.Vars(r)
+
+	conversationID := vars["conversation_id"]
+	conversations, err := getConversationsByID(conversationID)
+	if err != nil {
+		renderError(w, fmt.Sprintf("%s", err), http.StatusInternalServerError)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	data := struct {
+		ConversationID string         `json:"id"`
+		Conversations  []Conversation `json:"messages"`
+	}{
+		ConversationID: conversationID,
+		Conversations:  conversations,
+	}
+	json.NewEncoder(w).Encode(data)
 }
 
 // GetMessages shows the Message form
