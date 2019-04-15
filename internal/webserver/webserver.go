@@ -42,7 +42,7 @@ type ConversationPost struct {
 	Message        string `json:"message"`
 }
 
-var templates = template.Must(template.ParseGlob(getCallerDir() + "/../../web/template/*.html"))
+var templates = template.Must(template.ParseGlob(getCallerDir() + "/web/template/*.html"))
 
 var routes []Route
 var db *sql.DB
@@ -387,5 +387,9 @@ func getCallerDir() string {
 		return ""
 	}
 
-	return path.Dir(filename)
+	baseDir := path.Dir(filename)
+	log.Println(baseDir)
+	baseDir = path.Clean(baseDir + "/../../")
+
+	return baseDir
 }
