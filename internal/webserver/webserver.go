@@ -208,7 +208,8 @@ func GetConversationJSON(w http.ResponseWriter, r *http.Request) {
 	conversationID := vars["conversation_id"]
 	conversations, err := getConversationsByID(conversationID)
 	if err != nil {
-		renderError(w, fmt.Sprintf("%s", err), http.StatusInternalServerError)
+		renderJSONError(w, fmt.Sprintf("%s", err), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -290,6 +291,18 @@ func PostMessages(w http.ResponseWriter, r *http.Request) {
 func renderError(w http.ResponseWriter, errorMsg string, responseCode int) {
 	w.WriteHeader(responseCode)
 	w.Write([]byte(errorMsg))
+}
+
+func renderJSONError(w http.ResponseWriter, errorMsg string, responseCode int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(responseCode)
+
+	data := struct {
+		Error string `json:"errorMessage"`
+	}{
+		Error: errorMsg,
+	}
+	json.NewEncoder(w).Encode(data)
 }
 
 func randToken(len int) string {
