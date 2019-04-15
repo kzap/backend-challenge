@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"path"
 	"runtime"
-	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -35,6 +34,12 @@ type Conversation struct {
 	Sender         string `json:"sender"`
 	Message        string `json:"message"`
 	CreatedDate    string `json:"created"`
+}
+
+type ConversationPost struct {
+	ConversationID string `json:"conversation_id,omitempty"`
+	Sender         string `json:"sender"`
+	Message        string `json:"message"`
 }
 
 var templates = template.Must(template.ParseGlob(getCallerDir() + "/../../web/template/*.html"))
@@ -209,7 +214,7 @@ func GetConversationJSON(w http.ResponseWriter, r *http.Request) {
 	conversationID := vars["conversation_id"]
 	conversations, err := getConversationsByID(conversationID)
 	if err != nil {
-		renderJSONError(w, fmt.Sprintf("%s", err), http.StatusInternalServerError)
+		renderErrorJSON(w, fmt.Sprintf("%s", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -236,44 +241,107 @@ func GetMessages(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func getPostMessageForm(r *http.Request) (ConversationPost, error) {
+	var c ConversationPost
+	c.ConversationID = r.FormValue("conversation_id")
+	if c.ConversationID == "" {
+		c.ConversationID = randToken(8)
+	}
+	c.Sender = r.FormValue("sender")
+	if strings.TrimSpace(c.Sender) == "" {
+		return c, errors.New("FORM_EMPTY_SENDER")
+	}
+	c.Message = r.FormValue("message")
+	if strings.TrimSpace(c.Message) == "" {
+		return c, errors.New("FORM_EMPTY_MESSAGE")
+	}
+
+	return c, nil
+}
+
+func getPostMessageJSON(r *http.Request) (ConversationPost, error) {
+	var c ConversationPost
+
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&c)
+	if err != nil {
+		return c, err
+	}
+
+	if c.ConversationID == "" {
+		c.ConversationID = randToken(8)
+	}
+
+	if strings.TrimSpace(c.Sender) == "" {
+		return c, errors.New("JSON_EMPTY_SENDER")
+	}
+
+	if strings.TrimSpace(c.Message) == "" {
+		return c, errors.New("JSON_EMPTY_MESSAGE")
+	}
+
+	return c, nil
+}
+
 // PostMessages handles the receiving of messages
 func PostMessages(w http.ResponseWriter, r *http.Request) {
-	var err error
+	contentType := r.Header.Get("Content-type")
+	switch contentType {
+	case "application/json":
+		postMessageJSON(w, r)
+	default:
+		postMessageForm(w, r)
+	}
+}
 
-	formConversationID := r.FormValue("conversation_id")
-	if formConversationID == "" {
-		formConversationID = randToken(8)
-	}
-	formSender := r.FormValue("sender")
-	if strings.TrimSpace(formSender) == "" {
-		renderError(w, "FORM_EMPTY_SENDER", http.StatusUnprocessableEntity)
+func postMessageJSON(w http.ResponseWriter, r *http.Request) {
+	c, err := getPostMessageJSON(r)
+	if err != nil {
+		renderErrorJSON(w, fmt.Sprintf("%s", err), http.StatusUnprocessableEntity)
 		return
-	}
-	formMessage := r.FormValue("message")
-	if strings.TrimSpace(formMessage) == "" {
-		renderError(w, "FORM_EMPTY_MESSAGE", http.StatusUnprocessableEntity)
-		return
-	}
-	formRedirect := r.FormValue("redirect")
-	redirect := false
-	if formRedirect != "" {
-		redirect, err = strconv.ParseBool(formRedirect)
-		if err != nil {
-			renderError(w, "ERROR_PARSEBOOL", http.StatusInternalServerError)
-			log.Println(err)
-			return
-		}
 	}
 
 	// perform a db.Query insert
 	insertQuery := fmt.Sprintf(
 		"INSERT INTO `conversations` VALUES (DEFAULT, '%v', '%v', '%v', DEFAULT)",
-		formConversationID,
-		formSender,
-		formMessage)
+		c.ConversationID,
+		c.Sender,
+		c.Message)
 	_, err = db.Query(insertQuery)
+	if err != nil {
+		renderErrorJSON(w, "CANT_INSERT_DB", http.StatusInternalServerError)
+		log.Println(err)
+		log.Println(insertQuery)
+		return
+	}
 
-	// if there is an error inserting, handle it
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	data := struct {
+		Status  int    `json:"status"`
+		Message string `json:"message"`
+	}{
+		Status:  http.StatusOK,
+		Message: "Success",
+	}
+	json.NewEncoder(w).Encode(data)
+}
+
+func postMessageForm(w http.ResponseWriter, r *http.Request) {
+	c, err := getPostMessageForm(r)
+	if err != nil {
+		renderError(w, fmt.Sprintf("%s", err), http.StatusUnprocessableEntity)
+		return
+	}
+
+	// perform a db.Query insert
+	insertQuery := fmt.Sprintf(
+		"INSERT INTO `conversations` VALUES (DEFAULT, '%v', '%v', '%v', DEFAULT)",
+		c.ConversationID,
+		c.Sender,
+		c.Message)
+	_, err = db.Query(insertQuery)
 	if err != nil {
 		renderError(w, "CANT_INSERT_DB", http.StatusInternalServerError)
 		log.Println(err)
@@ -281,12 +349,7 @@ func PostMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if redirect {
-		http.Redirect(w, r, "/conversations/"+formConversationID, 302)
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("SUCCESS"))
+	http.Redirect(w, r, "/conversations/"+c.ConversationID, 302)
 }
 
 func renderError(w http.ResponseWriter, errorMsg string, responseCode int) {
@@ -294,7 +357,7 @@ func renderError(w http.ResponseWriter, errorMsg string, responseCode int) {
 	w.Write([]byte(errorMsg))
 }
 
-func renderJSONError(w http.ResponseWriter, errorMsg string, responseCode int) {
+func renderErrorJSON(w http.ResponseWriter, errorMsg string, responseCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(responseCode)
 
