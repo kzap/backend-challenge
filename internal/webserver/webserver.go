@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -180,6 +181,7 @@ func GetConversation(w http.ResponseWriter, r *http.Request) {
 	conversations, err := getConversationsByID(conversationID)
 	if err != nil {
 		renderError(w, fmt.Sprintf("%s", err), http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -250,6 +252,16 @@ func PostMessages(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "FORM_EMPTY_MESSAGE", http.StatusUnprocessableEntity)
 		return
 	}
+	formRedirect := r.FormValue("redirect")
+	redirect := false
+	if formRedirect != "" {
+		redirect, err = strconv.ParseBool(formRedirect)
+		if err != nil {
+			renderError(w, "ERROR_PARSEBOOL", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+	}
 
 	// perform a db.Query insert
 	insertQuery := fmt.Sprintf(
@@ -267,7 +279,12 @@ func PostMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/conversations/"+formConversationID, 302)
+	if redirect {
+		http.Redirect(w, r, "/conversations/"+formConversationID, 302)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("SUCCESS"))
 }
 
 func renderError(w http.ResponseWriter, errorMsg string, responseCode int) {
