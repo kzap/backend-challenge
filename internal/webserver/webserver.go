@@ -388,7 +388,6 @@ func getCallerDir() string {
 	}
 
 	baseDir := path.Dir(filename)
-	log.Println(baseDir)
 	baseDir = path.Clean(baseDir + "/../../")
 
 	return baseDir
