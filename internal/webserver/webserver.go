@@ -8,6 +8,8 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"path"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -35,8 +37,7 @@ type Conversation struct {
 	CreatedDate    string `json:"created"`
 }
 
-// parse templates dir
-var templates = template.Must(template.ParseGlob("./web/template/*.html"))
+var templates = template.Must(template.ParseGlob(getCallerDir() + "/../../web/template/*.html"))
 
 var routes []Route
 var db *sql.DB
@@ -298,9 +299,11 @@ func renderJSONError(w http.ResponseWriter, errorMsg string, responseCode int) {
 	w.WriteHeader(responseCode)
 
 	data := struct {
-		Error string `json:"errorMessage"`
+		Status int    `json:"status"`
+		Error  string `json:"error"`
 	}{
-		Error: errorMsg,
+		Status: responseCode,
+		Error:  errorMsg,
 	}
 	json.NewEncoder(w).Encode(data)
 }
@@ -313,4 +316,13 @@ func randToken(len int) string {
 	}
 
 	return fmt.Sprintf("%x", b)
+}
+
+func getCallerDir() string {
+	_, filename, _, ok := runtime.Caller(1)
+	if !ok {
+		return ""
+	}
+
+	return path.Dir(filename)
 }
