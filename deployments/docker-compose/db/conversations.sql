@@ -39,7 +39,7 @@ CREATE TABLE `conversations` (
 --
 ALTER TABLE `conversations`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `conversation_id` (`conversation_id`),
+  ADD KEY `conversation_id` (`conversation_id`),
   ADD KEY `sender` (`sender`),
   ADD KEY `created_date` (`created_date`);
 
