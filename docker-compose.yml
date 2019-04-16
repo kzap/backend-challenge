@@ -17,6 +17,7 @@ services:
     networks:
       - ada_public
       - ada_internal
+    restart: always
 
   db:
     image: mysql:8.0
