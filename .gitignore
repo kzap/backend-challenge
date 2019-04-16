@@ -6,7 +6,7 @@
 .DS_Store
 
 # Binaries for programs and plugins
-backend-challenge
+./backend-challenge
 cmd/backend-challenge/backend-challenge
 *.exe
 *.exe~
